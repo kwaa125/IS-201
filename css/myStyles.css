@@ -1,0 +1,101 @@
+.subTitle{
+    font-weight: bold;
+}
+
+.subTitle ul li {
+    font-weight: normal;
+}
+
+img{
+   display: block;
+   width: 35%;
+   margin-left: auto;
+   margin-right: auto;
+}
+
+.mainbody{
+   background-color: whitesmoke;
+   
+}
+
+body{
+    font-family: 'Times New Roman', Times, serif;
+    text-align: center;
+}
+
+/* This ensures the very first list on the page stays centered and inside the border */
+body > ul {
+    display: table;
+    margin: 20px auto;
+    padding-left: 40px; /* This pushes the bullets away from the edge */
+}
+
+ul {
+    list-style-position: inside; /* This pulls the dots next to the words */
+    padding: 0;                  /* Removes extra side-spacing */
+    text-align: left;
+}
+
+ul:first-of-type {
+    list-style-position: inside;
+    padding-left: 0;
+}
+
+ol {
+    display: table;
+    margin: 0 auto;
+    text-align: left;
+}
+
+ul {
+    list-style-type: circle;
+    padding-left: 25px; /* This aligns the bullets under the text of the number */
+}
+
+li {
+    padding: 5px 0;
+}
+
+.tableauPlaceholder {
+    margin: 0 auto; /* This centers the graph horizontally */
+}
+
+iframe{
+    display: block; margin: 0 auto
+}
+/* This targets the sub-lists specifically */
+.subTitle ul {
+    padding-left: 20px;   /* Adjust this number until they line up */
+    margin-left: 0;
+    display: block;       /* Forces them to their own line under the title */
+}
+
+nav{
+   padding: 10px;
+   overflow: hidden;
+}
+
+
+nav a{
+   color: #333;
+   padding:10px;
+   text-decoration: none;
+   font-size: 16px;
+   font-weight: bold;
+   float: left;
+}
+
+
+nav a:hover{
+   background-color: #ccc;
+}
+
+.gotop{
+    color: #333;
+    background-color: #ccc;
+   padding:10px;
+   border: #333;
+   font-size: 16px;
+   font-weight: bold;
+}
+

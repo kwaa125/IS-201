@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cute Slice Master</title>
+    <style>
+        :root {
+            --bg-color: #fdf0f6;
+            --ui-color: #ff85a2;
+            --bomb-color: #4a4a4a;
+            --font-main: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            font-family: var(--font-main);
+            user-select: none;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas { display: block; cursor: crosshair; }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .score-board {
+            color: var(--ui-color);
+            font-size: 2rem;
+            font-weight: bold;
+            text-shadow: 2px 2px white;
+        }
+
+        .high-score {
+            color: #b5ead7;
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-shadow: 1px 1px #666;
+        }
+
+        #overlay {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 2.5rem;
+            border-radius: 30px;
+            text-align: center;
+            box-shadow: 0 15px 35px rgba(255, 133, 162, 0.3);
+            border: 5px solid var(--ui-color);
+            z-index: 10;
+        }
+
+        h1 { color: var(--ui-color); margin-top: 0; font-size: 2.5rem; }
+        p { color: #666; margin-bottom: 20px; }
+
+        button {
+            background: var(--ui-color);
+            color: white;
+            border: none;
+            padding: 12px 35px;
+            font-size: 1.4rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+            box-shadow: 0 5px 0 #d66d87;
+        }
+
+        button:hover { transform: scale(1.05); background: #ff7091; }
+        button:active { transform: translateY(3px); box-shadow: 0 2px 0 #d66d87; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="ui-layer">
+        <div class="score-board">Score: <span id="score">0</span></div>
+        <div class="high-score">Best: <span id="highScore">0</span></div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="overlay">
+        <h1 id="status-title">Slice Master</h1>
+        <p id="status-msg">Avoid the black bombs!</p>
+        <button onclick="startGame()">Start Game</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreElement = document.getElementById('score');
+    const highScoreElement = document.getElementById('highScore');
+    const overlay = document.getElementById('overlay');
+    const statusTitle = document.getElementById('status-title');
+    const statusMsg = document.getElementById('status-msg');
+
+    let score = 0;
+    let highScore = localStorage.getItem('sliceHighScore') || 0;
+    let gameActive = false;
+    let targets = [];
+    let particles = [];
+    let mouseTrail = [];
+    
+    highScoreElement.innerText = highScore;
+
+    const colors = ['#ffb7b2', '#ffdac1', '#e2f0cb', '#b5ead7', '#c7ceea', '#ff9aa2'];
+    const shapes = ['circle', 'square', 'star', 'bomb'];
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    class Target {
+        constructor() {
+            this.type = Math.random() < 0.15 ? 'bomb' : 'fruit'; // 15% chance for a bomb
+            this.x = Math.random() * (canvas.width - 100) + 50;
+            this.y = canvas.height + 50;
+            this.size = this.type === 'bomb' ? 35 : Math.random() * 20 + 30;
+            this.color = this.type === 'bomb' ? '#444' : colors[Math.floor(Math.random() * colors.length)];
+            
+            this.vx = (Math.random() - 0.5) * 6;
+            this.vy = -(Math.random() * 6 + 13);
+            this.gravity = 0.25;
+            this.rotation = 0;
+            this.rotSpeed = (Math.random() - 0.5) * 0.1;
+        }
+
+        update() {
+            this.x += this.vx;
+            this.vy += this.gravity;
+            this.y += this.vy;
+            this.rotation += this.rotSpeed;
+        }
+
+        draw() {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.rotation);
+            
+            if (this.type === 'bomb') {
+                // Draw Bomb Body
+                ctx.fillStyle = '#333';
+                ctx.beginPath();
+                ctx.arc(0, 0, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                // Fuse
+                ctx.strokeStyle = '#8b4513';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(0, -this.size);
+                ctx.quadraticCurveTo(10, -this.size-15, 5, -this.size-25);
+                ctx.stroke();
+                // Sparkle
+                ctx.fillStyle = '#ffff00';
+                ctx.beginPath();
+                ctx.arc(5, -this.size-25, 4 + Math.random()*3, 0, Math.PI*2);
+                ctx.fill();
+            } else {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.roundRect(-this.size, -this.size, this.size*2, this.size*2, 10);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+    }
+
+    class Particle {
+        constructor(x, y, color, isExplosion = false) {
+            this.x = x;
+            this.y = y;
+            this.color = color;
+            this.size = Math.random() * (isExplosion ? 10 : 4) + 2;
+            this.vx = (Math.random() - 0.5) * (isExplosion ? 20 : 10);
+            this.vy = (Math.random() - 0.5) * (isExplosion ? 20 : 10);
+            this.life = 1.0;
+        }
+        update() {
+            this.x += this.vx;
+            this.y += this.vy;
+            this.life -= 0.02;
+        }
+        draw() {
+            ctx.globalAlpha = this.life;
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+        }
+    }
+
+    function startGame() {
+        score = 0;
+        scoreElement.innerText = score;
+        targets = [];
+        particles = [];
+        gameActive = true;
+        overlay.style.display = 'none';
+        animate();
+    }
+
+    function gameOver() {
+        gameActive = false;
+        if (score > highScore) {
+            highScore = score;
+            localStorage.setItem('sliceHighScore', highScore);
+            highScoreElement.innerText = highScore;
+        }
+        statusTitle.innerText = "BOOM!";
+        statusMsg.innerText = `You hit a bomb! Final Score: ${score}`;
+        overlay.style.display = 'block';
+    }
+
+    function handleSlice(x, y) {
+        if (!gameActive) return;
+        targets.forEach((target, index) => {
+            const dist = Math.hypot(target.x - x, target.y - y);
+            if (dist < target.size + 20) {
+                if (target.type === 'bomb') {
+                    for(let i=0; i<30; i++) particles.push(new Particle(target.x, target.y, '#ff4d4d', true));
+                    gameOver();
+                } else {
+                    score += 10;
+                    scoreElement.innerText = score;
+                    for(let i=0; i<12; i++) particles.push(new Particle(target.x, target.y, target.color));
+                    targets.splice(index, 1);
+                }
+            }
+        });
+    }
+
+    // Input
+    let isDragging = false;
+    const setDrag = (val) => { isDragging = val; if(!val) mouseTrail = []; };
+
+    canvas.addEventListener('mousedown', () => setDrag(true));
+    canvas.addEventListener('mouseup', () => setDrag(false));
+    canvas.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        mouseTrail.push({x: e.clientX, y: e.clientY});
+        if (mouseTrail.length > 8) mouseTrail.shift();
+        handleSlice(e.clientX, e.clientY);
+    });
+
+    canvas.addEventListener('touchstart', (e) => { setDrag(true); e.preventDefault(); });
+    canvas.addEventListener('touchend', () => setDrag(false));
+    canvas.addEventListener('touchmove', (e) => {
+        const touch = e.touches[0];
+        mouseTrail.push({x: touch.clientX, y: touch.clientY});
+        if (mouseTrail.length > 8) mouseTrail.shift();
+        handleSlice(touch.clientX, touch.clientY);
+        e.preventDefault();
+    });
+
+    function animate() {
+        if (!gameActive) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (Math.random() < 0.04) targets.push(new Target());
+
+        targets.forEach((t, i) => {
+            t.update();
+            t.draw();
+            if (t.y > canvas.height + 100) targets.splice(i, 1);
+        });
+
+        particles.forEach((p, i) => {
+            p.update();
+            p.draw();
+            if (p.life <= 0) particles.splice(i, 1);
+        });
+
+        if (mouseTrail.length > 1) {
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 6;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(mouseTrail[0].x, mouseTrail[0].y);
+            for(let i=1; i<mouseTrail.length; i++) ctx.lineTo(mouseTrail[i].x, mouseTrail[i].y);
+            ctx.stroke();
+        }
+        
+        requestAnimationFrame(animate);
+    }
+</script>
+
+</body>
+</html>
